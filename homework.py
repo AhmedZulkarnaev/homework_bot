@@ -23,10 +23,11 @@ HOMEWORK_VERDICTS = {
 
 
 logging.basicConfig(
-    filename="logfile.log",
     level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 def check_tokens():
@@ -68,13 +69,16 @@ def get_api_answer(timestamp):
 def check_response(response):
     """Проверка ответа"""
     if not isinstance(response, dict):
-        raise TypeError("Response должен быть словарем")
+        logger.error("Response должен быть словарем")
+        raise TypeError()
 
     if not isinstance(response.get("homeworks"), list):
-        raise TypeError("Homeworks должен быть списком")
+        logger.error("Homeworks должен быть списком")
+        raise TypeError()
 
     if "homeworks" not in response:
-        raise KeyError("Нет такого ключа")
+        logger.error("Нет такого ключа")
+        raise KeyError()
 
 
 def parse_status(homework):
@@ -95,6 +99,7 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     if not check_tokens():
+        logger.critical("Отсутствуют обязательные переменные окружения")
         sys.exit(1)
     while True:
         try:
