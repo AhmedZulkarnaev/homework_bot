@@ -30,13 +30,15 @@ logging.basicConfig(
 
 
 def check_tokens():
-    """Проверка на наличие переменных"""
-    required_variables = [
-        "PRACTICUM_TOKEN", "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID"]
-    for var in required_variables:
-        if not os.getenv(var):
-            logging.critical(f"Отсутствует переменная окружения: {var}")
-    return True
+    "Проверка наличия переменных"
+    required_variables = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
+    if all(required_variables):
+        return True
+    else:
+        for var in required_variables:
+            if not var:
+                logging.critical(f"Отсутствует переменная окружения: {var}")
+        return False
 
 
 def send_message(bot, message):
@@ -55,10 +57,12 @@ def get_api_answer(timestamp):
             ENDPOINT, headers=HEADERS, params={"from_date": timestamp}
         )
         response.raise_for_status()
+        if response.status_code != 200:
+            logging.error(f"Ошибка: код ответа {response.status_code} от API")
+            raise ValueError()
         return response.json()
     except requests.RequestException as e:
         logging.error(f"Ошибка при запросе к API: {e}")
-    return None
 
 
 def check_response(response):
@@ -86,15 +90,15 @@ def parse_status(homework):
         raise KeyError("Отсутствует ключ 'homework_name'")
 
 
-
 def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-
+    if not check_tokens():
+        sys.exit(1)
     while True:
         try:
-            response = get_api_answer(0)
+            response = get_api_answer(timestamp)
             if response is not None:
                 check_response(response)
                 updates = response.get("homeworks")
