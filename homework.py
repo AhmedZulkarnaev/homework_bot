@@ -24,7 +24,8 @@ HOMEWORK_VERDICTS = {
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename='program.log'
 )
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -38,7 +39,7 @@ def check_tokens():
     else:
         for var in required_variables:
             if not var:
-                logging.critical(f"Отсутствует переменная окружения: {var}")
+                logger.critical(f"Отсутствует переменная окружения: {var}")
         return False
 
 
@@ -46,9 +47,9 @@ def send_message(bot, message):
     """Отправляет сообщение в Telegram."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-        logging.debug(f"Сообщение успешно отправлено в Telegram: {message}")
+        logger.debug(f"Сообщение успешно отправлено в Telegram: {message}")
     except Exception as e:
-        logging.error(f"Сбой при отправке сообщения в Telegram: {e}")
+        logger.error(f"Сбой при отправке сообщения в Telegram: {e}")
 
 
 def get_api_answer(timestamp):
@@ -59,11 +60,11 @@ def get_api_answer(timestamp):
         )
         response.raise_for_status()
         if response.status_code != 200:
-            logging.error(f"Ошибка: код ответа {response.status_code} от API")
+            logger.error(f"Ошибка: код ответа {response.status_code} от API")
             raise ValueError()
         return response.json()
     except requests.RequestException as e:
-        logging.error(f"Ошибка при запросе к API: {e}")
+        logger.error(f"Ошибка при запросе к API: {e}")
 
 
 def check_response(response):
@@ -90,7 +91,7 @@ def parse_status(homework):
         verdict = HOMEWORK_VERDICTS[status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
     else:
-        logging.error(f"Неожиданный статус работы: {status}")
+        logger.error(f"Неожиданный статус работы: {status}")
         raise KeyError("Отсутствует ключ 'homework_name'")
 
 
@@ -113,13 +114,13 @@ def main():
                         if status:
                             send_message(bot, f"{status}")
                 else:
-                    logging.debug("Нет новых статусов в ответе API.")
+                    logger.debug("Нет новых статусов в ответе API.")
             else:
-                logging.error("Не удалось получить данные от API.")
+                logger.error("Не удалось получить данные от API.")
             time.sleep(RETRY_PERIOD)
         except Exception as error:
             message = f"Сбой в работе программы: {error}"
-            logging.exception(message)
+            logger.exception(message)
             time.sleep(RETRY_PERIOD)
 
 
