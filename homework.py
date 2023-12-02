@@ -32,7 +32,7 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 def check_tokens():
-    "Проверка наличия переменных"
+    """Проверка наличия переменных"""
     required_variables = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
     if all(required_variables):
         return True
