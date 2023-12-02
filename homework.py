@@ -32,7 +32,7 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 def check_tokens():
-    """Проверка наличия переменных"""
+    """Проверка наличия переменных."""
     required_variables = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
     if all(required_variables):
         return True
@@ -53,7 +53,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    """Получение апи ответа"""
+    """Получение апи ответа."""
     try:
         response = requests.get(
             ENDPOINT, headers=HEADERS, params={"from_date": timestamp}
@@ -68,7 +68,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-    """Проверка ответа"""
+    """Проверка ответа."""
     if not isinstance(response, dict):
         logger.error("Response должен быть словарем")
         raise TypeError()
@@ -83,7 +83,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Парсинг статусов работ"""
+    """Парсинг статусов работ."""
     status = homework.get("status")
     homework_name = homework.get("homework_name")
 
