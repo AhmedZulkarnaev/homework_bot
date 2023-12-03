@@ -1,5 +1,6 @@
 import os
 import sys
+from urllib.error import HTTPError
 import telegram
 import requests
 import time
@@ -21,12 +22,9 @@ HOMEWORK_VERDICTS = {
     "rejected": "Работа проверена: у ревьюера есть замечания.",
 }
 
+script_path = os.path.abspath(__file__)
+log_filename = os.path.join(os.path.dirname(script_path), 'program.log')
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='program.log'
-)
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
@@ -34,22 +32,26 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 def check_tokens():
     """Проверка наличия переменных."""
     required_variables = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
-    if all(required_variables):
-        return True
-    else:
-        for var in required_variables:
-            if not var:
-                logger.critical(f"Отсутствует переменная окружения: {var}")
+    missing_variables = [var_name for var_name, var in zip(
+        ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID'],
+        required_variables) if not var]
+
+    if missing_variables:
+        logger.critical(
+            f"Отсутствуют переменные окружения: {', '.join(missing_variables)}"
+        )
         return False
+    return True
 
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-        logger.debug(f"Сообщение успешно отправлено в Telegram: {message}")
-    except Exception as e:
-        logger.error(f"Сбой при отправке сообщения в Telegram: {e}")
+    except telegram.error.TelegramError as e:
+        logger.error(f"Ошибка при отправке сообщения в Telegram: {e}")
+    else:
+        logger.debug("Сообщение успешно отправлено в Telegram")
 
 
 def get_api_answer(timestamp):
@@ -58,28 +60,29 @@ def get_api_answer(timestamp):
         response = requests.get(
             ENDPOINT, headers=HEADERS, params={"from_date": timestamp}
         )
-        response.raise_for_status()
         if response.status_code != 200:
-            logger.error(f"Ошибка: код ответа {response.status_code} от API")
-            raise ValueError()
+            raise HTTPError(f"Неверный код состояния: {response.status_code}")
         return response.json()
     except requests.RequestException as e:
-        logger.error(f"Ошибка при запросе к API: {e}")
+        logger.debug(f"Ошибка при запросе к API: {e}")
 
 
 def check_response(response):
     """Проверка ответа."""
     if not isinstance(response, dict):
-        logger.error("Response должен быть словарем")
-        raise TypeError()
-
-    if not isinstance(response.get("homeworks"), list):
-        logger.error("Homeworks должен быть списком")
         raise TypeError()
 
     if "homeworks" not in response:
-        logger.error("Нет такого ключа")
         raise KeyError()
+
+    if not isinstance(response.get("homeworks"), list):
+        raise TypeError()
+
+    if "current_date" not in response:
+        raise KeyError()
+
+    if not isinstance(response.get("current_date"), int):
+        raise TypeError()
 
 
 def parse_status(homework):
@@ -90,9 +93,7 @@ def parse_status(homework):
     if status in HOMEWORK_VERDICTS and homework_name:
         verdict = HOMEWORK_VERDICTS[status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-    else:
-        logger.error(f"Неожиданный статус работы: {status}")
-        raise KeyError("Отсутствует ключ 'homework_name'")
+    raise ValueError("Проблема со значением переменной 'status'")
 
 
 def main():
@@ -100,29 +101,34 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     if not check_tokens():
-        logger.critical("Отсутствуют обязательные переменные окружения")
         sys.exit(1)
     while True:
         try:
             response = get_api_answer(timestamp)
-            if response is not None:
+            if response:
                 check_response(response)
                 updates = response.get("homeworks")
                 if updates:
-                    for homework in updates:
-                        status = parse_status(homework)
-                        if status:
-                            send_message(bot, f"{status}")
+                    status = parse_status(updates[0])
+                    if status:
+                        send_message(bot, f"{status}")
                 else:
                     logger.debug("Нет новых статусов в ответе API.")
             else:
                 logger.error("Не удалось получить данные от API.")
-            time.sleep(RETRY_PERIOD)
+        except HTTPError as http_error:
+            logger.error(f"Ошибка HTTP при запросе к API: {http_error}")
+        except requests.RequestException as request_exception:
+            logger.error(f"Ошибка запроса к API: {request_exception}")
         except Exception as error:
-            message = f"Сбой в работе программы: {error}"
-            logger.exception(message)
+            logger.error(f"Сбой в работе программы: {error}")
+        finally:
             time.sleep(RETRY_PERIOD)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s: %(levelname)s - %(funcName)s - %(message)s',
+        filename='my_logging.log')
     main()
