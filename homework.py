@@ -1,11 +1,11 @@
 import os
 import sys
 import time
-import logging
 
-from urllib.error import HTTPError
-import telegram
+import logging
 import requests
+import telegram
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,8 +23,6 @@ HOMEWORK_VERDICTS = {
     "rejected": "Работа проверена: у ревьюера есть замечания.",
 }
 
-script_path = os.path.abspath(__file__)
-log_filename = os.path.join(os.path.dirname(script_path), 'program.log')
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -32,17 +30,19 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 def check_tokens():
     """Проверка наличия переменных."""
-    required_variables = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
-    missing_variables = [var_name for var_name, var in zip(
-        ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID'],
-        required_variables) if not var]
-
+    required_variables = [
+        'PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID'
+    ]
+    missing_variables = [
+        var_name for var_name in required_variables if not globals()[var_name]
+    ]
+    # Если честно непонятна такая логика True/False
     if missing_variables:
         logger.critical(
             f"Отсутствуют переменные окружения: {', '.join(missing_variables)}"
         )
-        return False
-    return True
+        return missing_variables
+    return missing_variables
 
 
 def send_message(bot, message):
@@ -62,28 +62,33 @@ def get_api_answer(timestamp):
             ENDPOINT, headers=HEADERS, params={"from_date": timestamp}
         )
         if response.status_code != 200:
-            raise HTTPError(f"Неверный код состояния: {response.status_code}")
-        return response.json()
-    except requests.RequestException as e:
-        logger.debug(f"Ошибка при запросе к API: {e}")
+            raise requests.HTTPError(  # ?
+                f"Неуспешный код состояния: {response.status_code}"
+            )
+        try:
+            return response.json()
+        except ValueError as value_error:
+            raise ValueError(f"Ошибка парсинга JSON: {value_error}")
+    except requests.RequestException as request_exception:
+        raise ValueError(f"Ошибка запроса к API: {request_exception}")
 
 
 def check_response(response):
     """Проверка ответа."""
     if not isinstance(response, dict):
-        raise TypeError()
+        raise TypeError('response должен быть типа dict')
 
     if "homeworks" not in response:
-        raise KeyError()
+        raise KeyError('Нет такого ключа как homeworks')
 
     if not isinstance(response.get("homeworks"), list):
-        raise TypeError()
+        raise TypeError('Данные homeworks должны быть типа list')
 
     if "current_date" not in response:
-        raise KeyError()
+        logger.error("Отсутствует ключ 'current_date'")
 
     if not isinstance(response.get("current_date"), int):
-        raise TypeError()
+        raise TypeError('Данные current_date должны быть типа int')
 
 
 def parse_status(homework):
@@ -101,35 +106,30 @@ def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    if not check_tokens():
+    if check_tokens():
         sys.exit(1)
     while True:
         try:
             response = get_api_answer(timestamp)
-            if response:
-                check_response(response)
-                updates = response.get("homeworks")
-                if updates:
-                    status = parse_status(updates[0])
-                    if status:
-                        send_message(bot, f"{status}")
-                else:
-                    logger.debug("Нет новых статусов в ответе API.")
+            check_response(response)
+            updates = response.get("homeworks")
+            if updates:
+                status = parse_status(updates[0])
+                send_message(bot, f"{status}")
             else:
-                logger.error("Не удалось получить данные от API.")
-        except HTTPError as http_error:
-            logger.error(f"Ошибка HTTP при запросе к API: {http_error}")
-        except requests.RequestException as request_exception:
-            logger.error(f"Ошибка запроса к API: {request_exception}")
+                logger.debug("Нет новых статусов в ответе API.")
         except Exception as error:
             logger.error(f"Сбой в работе программы: {error}")
+            send_message(bot, f"Сбой в работе программы: {error}")
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    script_path = os.path.abspath(__file__)
+    log_filename = os.path.join(os.path.dirname(script_path), 'program.log')
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s: %(levelname)s - %(funcName)s - %(message)s',
-        filename='my_logging.log')
+        filename=log_filename)
     main()
