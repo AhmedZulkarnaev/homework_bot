@@ -36,7 +36,7 @@ def check_tokens():
     missing_variables = [
         var_name for var_name in required_variables if not globals()[var_name]
     ]
-    # Если честно непонятна такая логика True/False
+    # почему нельзя оставить True/False
     if missing_variables:
         logger.critical(
             f"Отсутствуют переменные окружения: {', '.join(missing_variables)}"
@@ -85,7 +85,7 @@ def check_response(response):
         raise TypeError('Данные homeworks должны быть типа list')
 
     if "current_date" not in response:
-        logger.error("Отсутствует ключ 'current_date'")
+        raise KeyError("Отсутствует ключ 'current_date'")
 
     if not isinstance(response.get("current_date"), int):
         raise TypeError('Данные current_date должны быть типа int')
@@ -118,6 +118,9 @@ def main():
                 send_message(bot, f"{status}")
             else:
                 logger.debug("Нет новых статусов в ответе API.")
+        except KeyError as k_error:
+            # Ошибка ключа логируется и не отправляется в тг
+            logger.error(f"Отсутствует ключ '{k_error}'")
         except Exception as error:
             logger.error(f"Сбой в работе программы: {error}")
             send_message(bot, f"Сбой в работе программы: {error}")
