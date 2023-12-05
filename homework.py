@@ -1,8 +1,9 @@
 import os
 import sys
 import time
-
 import logging
+import json
+
 import requests
 import telegram
 
@@ -28,6 +29,13 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
+class ApiError(Exception):
+    """Исключение для ошибок при обращении к API."""
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+
 def check_tokens():
     """Проверка наличия переменных."""
     required_variables = [
@@ -36,13 +44,11 @@ def check_tokens():
     missing_variables = [
         var_name for var_name in required_variables if not globals()[var_name]
     ]
-    # почему нельзя оставить True/False
     if missing_variables:
         logger.critical(
             f"Отсутствуют переменные окружения: {', '.join(missing_variables)}"
         )
         return missing_variables
-    return missing_variables
 
 
 def send_message(bot, message):
@@ -62,15 +68,12 @@ def get_api_answer(timestamp):
             ENDPOINT, headers=HEADERS, params={"from_date": timestamp}
         )
         if response.status_code != 200:
-            raise requests.HTTPError(  # ?
-                f"Неуспешный код состояния: {response.status_code}"
-            )
-        try:
-            return response.json()
-        except ValueError as value_error:
-            raise ValueError(f"Ошибка парсинга JSON: {value_error}")
+            raise ApiError(f"Неуспешный код состояния: {response.status_code}")
+        return response.json()
+    except json.JSONDecodeError as value_error:
+        raise ValueError(f"Ошибка парсинга JSON: {value_error}")
     except requests.RequestException as request_exception:
-        raise ValueError(f"Ошибка запроса к API: {request_exception}")
+        raise ApiError(f"Ошибка запроса к API: {request_exception}")
 
 
 def check_response(response):
@@ -85,10 +88,10 @@ def check_response(response):
         raise TypeError('Данные homeworks должны быть типа list')
 
     if "current_date" not in response:
-        raise KeyError("Отсутствует ключ 'current_date'")
+        logger.info("Отсутствует ключ 'current_date'")
 
     if not isinstance(response.get("current_date"), int):
-        raise TypeError('Данные current_date должны быть типа int')
+        logger.info('Данные current_date должны быть типа int')
 
 
 def parse_status(homework):
@@ -118,9 +121,6 @@ def main():
                 send_message(bot, f"{status}")
             else:
                 logger.debug("Нет новых статусов в ответе API.")
-        except KeyError as k_error:
-            # Ошибка ключа логируется и не отправляется в тг
-            logger.error(f"Отсутствует ключ '{k_error}'")
         except Exception as error:
             logger.error(f"Сбой в работе программы: {error}")
             send_message(bot, f"Сбой в работе программы: {error}")
@@ -134,5 +134,6 @@ if __name__ == '__main__':
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s: %(levelname)s - %(funcName)s - %(message)s',
-        filename=log_filename)
+        filename=log_filename,
+        filemode='w')
     main()
