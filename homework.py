@@ -88,10 +88,10 @@ def check_response(response):
         raise TypeError('Данные homeworks должны быть типа list')
 
     if "current_date" not in response:
-        logger.info("Отсутствует ключ 'current_date'")
+        logger.debug("Отсутствует ключ 'current_date'")
 
     if not isinstance(response.get("current_date"), int):
-        logger.info('Данные current_date должны быть типа int')
+        logger.debug('Данные current_date должны быть типа int')
 
 
 def parse_status(homework):
