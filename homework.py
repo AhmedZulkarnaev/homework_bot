@@ -85,7 +85,7 @@ def check_response(response):
     if not isinstance(response.get("homeworks"), list):
         raise TypeError("Данные homeworks должны быть типа list")
 
-    if "current_date1" not in response:
+    if "current_date" not in response:
         raise VarTypeError("Отсутствует ключ 'current_date'")
 
     if not isinstance(response.get("current_date"), int):
