@@ -9,7 +9,7 @@ import telegram
 
 from dotenv import load_dotenv
 
-from exceptions import ApiError
+from exceptions import ApiError, VarTypeError
 
 load_dotenv()
 
@@ -34,7 +34,7 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 def check_tokens():
     """Проверка наличия переменных."""
     required_variables = [
-        'PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID'
+        "PRACTICUM_TOKEN", "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID"
     ]
     missing_variables = [
         var_name for var_name in required_variables if not globals()[var_name]
@@ -43,7 +43,7 @@ def check_tokens():
         logger.critical(
             f"Отсутствуют переменные окружения: {', '.join(missing_variables)}"
         )
-        return missing_variables
+    return missing_variables
 
 
 def send_message(bot, message):
@@ -74,19 +74,19 @@ def get_api_answer(timestamp):
 def check_response(response):
     """Проверка ответа."""
     if not isinstance(response, dict):
-        raise TypeError('response должен быть типа dict')
+        raise TypeError("response должен быть типа dict")
 
     if "homeworks" not in response:
-        raise KeyError('Нет такого ключа как homeworks')
+        raise KeyError("Нет такого ключа как homeworks")
 
     if not isinstance(response.get("homeworks"), list):
-        raise TypeError('Данные homeworks должны быть типа list')
+        raise TypeError("Данные homeworks должны быть типа list")
 
-    if "current_date" not in response:
-        logger.debug("Отсутствует ключ 'current_date'")
+    if "current_date1" not in response:
+        raise VarTypeError("Отсутствует ключ 'current_date'")
 
     if not isinstance(response.get("current_date"), int):
-        logger.debug('Данные current_date должны быть типа int')
+        raise VarTypeError("Данные current_date должны быть типа int")
 
 
 def parse_status(homework):
@@ -116,6 +116,8 @@ def main():
                 send_message(bot, f"{status}")
             else:
                 logger.debug("Нет новых статусов в ответе API.")
+        except VarTypeError as err:
+            logger.error(f"Ошибка: {err} ")
         except Exception as error:
             logger.error(f"Сбой в работе программы: {error}")
             send_message(bot, f"Сбой в работе программы: {error}")
@@ -123,12 +125,13 @@ def main():
             time.sleep(RETRY_PERIOD)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     script_path = os.path.abspath(__file__)
-    log_filename = os.path.join(os.path.dirname(script_path), 'program.log')
+    log_filename = os.path.join(os.path.dirname(script_path), "program.log")
     logging.basicConfig(
         level=logging.DEBUG,
-        format='%(asctime)s: %(levelname)s - %(funcName)s - %(message)s',
+        format="%(asctime)s: %(levelname)s - %(funcName)s - %(message)s",
         filename=log_filename,
-        filemode='w')
+        filemode="w",
+    )
     main()
