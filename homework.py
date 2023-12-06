@@ -1,15 +1,18 @@
+# Импорты из стандартных библиотек
+import json
+import logging
 import os
 import sys
 import time
-import logging
-import json
 
+# Импорты сторонних библиотек
 import requests
 import telegram
 
+# Импорты модулей этого проекта
 from dotenv import load_dotenv
-
 from exceptions import ApiError, VarTypeError
+
 
 load_dotenv()
 
